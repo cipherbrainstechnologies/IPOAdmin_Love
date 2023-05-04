@@ -20,6 +20,8 @@ const AddIpo = lazy(() => import("./View/AddIpo"));
 const IpoEdit = lazy(() => import("./View/IpoEdit"));
 const IpoDetail = lazy(() => import("./View/IpoDetail"));
 const SignIn = lazy(() => import("./View/SignIn"));
+const cors = require("cors")
+
 const App = () => {
   return (
     <>
