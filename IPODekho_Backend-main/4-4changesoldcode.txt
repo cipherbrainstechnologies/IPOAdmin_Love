@@ -1,0 +1,1844 @@
+//USER
+
+const { firestore } = require("../../config/firestoreCloud");
+const express = require("express");
+const webApp = express();
+const saltedMd5 = require("salted-md5");
+const path = require("path");
+var admin = require("firebase-admin");
+const base64ToImage = require("base64-to-image");
+/**
+ * The following Api contains source code for a Update Profile With Google Authentication.
+ */
+webApp.locals.bucket = admin.storage().bucket();
+const UpdateProfile = async (req, res, body) => {
+  try {
+    const str = req.body.photoURL;
+    const base64Str = str.slice(0, -1);
+    if (req.body.photoURL) {
+      const path = "./uploads/profile/";
+      const optionalObj = {
+        fileName: "",
+        type: base64Str.split(";")[0].split("/")[1],
+      };
+      const imageInfo = base64ToImage(base64Str, path, optionalObj);
+      const filePath = `http://13.234.12.69:6000/uploads/profile/${imageInfo.fileName}`;
+      const uid = req.body.id;
+      admin
+        .auth()
+        .updateUser(
+          uid,
+          {
+            displayName: req.body.displayName,
+            photoURL: filePath,
+            phoneNumber: req.body.phoneNumber || "",
+            email: req.body.email,
+          },
+          { merge: true },
+          { new: true }
+        )
+        .then((data) => {
+          if (data) {
+            return res.status(201).send({
+              msg: "Profile Updated SuccessFully",
+              data: data,
+            });
+          } else {
+            return res.status(300).send({
+              msg: "The user with the provided phone number Already exists",
+            });
+          }
+        })
+        .catch((error) => {
+          return res.status(400).send({
+            msg: error.errorInfo.code,
+          });
+          // }
+        });
+    } else if (req.body.photoURL == null) {
+      const uid = req.body.id;
+      admin
+        .auth()
+        .updateUser(uid, {
+          displayName: req.body.displayName,
+          phoneNumber: req.body.phoneNumber || "",
+          email: req.body.email,
+        })
+        .then((data) => {
+          return res.status(201).send({
+            msg: "Profile Updated SuccessFully",
+            data: data,
+          });
+        })
+        .catch((error) => {
+          return res.status(400).send({
+            msg: error.errorInfo.code,
+          });
+        });
+    }
+  } catch (error) {
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+// try {
+//   if (req.file) {
+//     const uid = req.params.id;
+//     const name = saltedMd5(req.file.originalname, "SUPER-S@LT!");
+//     const fileName = name + path.extname(req.file.originalname);
+//     await webApp.locals.bucket
+//       .file(fileName)
+//       .createWriteStream()
+//       .end(req.file.buffer);
+//     const file = `https://firebasestorage.googleapis.com/v0/b/ipodekho-19fc1.appspot.com/o/${fileName}?alt=media&token=11c648b5-a554-401c-bc4e-ba9155f29744`;
+//     // Update the user's profile information
+//     admin
+//       .auth()
+//       .updateUser(uid, {
+//         displayName: req.body.displayName,
+//         photoURL: file,
+//         phoneNumber: req.body.phoneNumber,
+//       })
+//       .then((data) => {
+//         return res.status(201).send({
+//           msg: "Updated SuccessFully",
+//           data: data,
+//         });
+//       })
+//       .catch((error) => {
+//         console.log(error);
+//         res.status(300).send({ msg: "PhoneNumber Already Exist" });
+//       });
+//   } else if (req.file == null) {
+//     const uid = req.params.id;
+//     admin
+//       .auth()
+//       .updateUser(uid, {
+//         displayName: req.body.displayName,
+//         phoneNumber: req.body.phoneNumber,
+//         photoURL: null,
+//       })
+//       .then((data) => {
+//         return res.status(201).send({
+//           msg: "Updated SuccessFully",
+//           data: data,
+//         });
+//       })
+//       .catch((error) => {
+//         console.log(error);
+//         res.status(300).send({ msg: "PhoneNumber Already Exist" });
+//       });
+//   }
+// } catch (error) {
+//   res.status(400).send({ msg: "User Not Found" });
+// }
+/**
+ * The following Api contains source code for a Get Single User.
+ */
+const getSingleUser = async (req, res) => {
+  try {
+    const id = req.params.id;
+    admin
+      .auth()
+      .getUser(id)
+      .then((user) => {
+        const photoURL = user.photoURL;
+        const displayName = user.displayName;
+        const phoneNumber = user.phoneNumber;
+        const email = user.providerData[0].email;
+        const GetSingleProfile = {
+          photoURL: photoURL,
+          displayName: displayName,
+          phoneNumber: phoneNumber,
+          email: email,
+          uid: id,
+        };
+        return res.status(201).send({
+          msg: "Get Single User SuccessFully",
+          data: GetSingleProfile,
+        });
+      })
+      .catch((error) => {
+        return res.status(301).send({
+          error,
+        });
+      });
+  } catch (error) {
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+/**
+ * The following Api contains source code for a Get All User.
+ */
+const getAllUser = async (req, res) => {
+  try {
+    const allUsers = [];
+    const listUsersResult = await admin.auth().listUsers();
+    listUsersResult.users.forEach((user) => {
+      allUsers.push(user);
+    });
+    res.status(201).send({
+      msg: "Get All User SuccessFully",
+      data: allUsers,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Internal Server Error" }).end();
+  }
+};
+module.exports = {
+  UpdateProfile,
+  getAllUser,
+  getSingleUser,
+};
+
+
+
+
+//user route
+const express = require("express");
+const router = express.Router();
+const multer = require("multer");
+const upload = multer({ storage: multer.memoryStorage() });
+const user = require("../../helper/user/userIPO");
+
+router.get("/getSingleUser/:id", user.getSingleUser);
+router.post("/getAllUser", user.getAllUser);
+router.post(
+  "/updateProfile/:id",
+  upload.single("photoURL"),
+  user.UpdateProfile
+);
+module.exports = {
+  router,
+};
+
+
+
+MAINLINE ipo
+
+const { firestore } = require("../../config/firestoreCloud");
+const express = require("express");
+const webApp = express();
+const saltedMd5 = require("salted-md5");
+const path = require("path");
+var admin = require("firebase-admin");
+const Tokens = firestore.collection("Tokens");
+const userInformation = firestore.collection("MainLineIPO");
+const messageCollection = firestore.collection("messageCollection");
+const algoliasearch = require("algoliasearch");
+const FCM = require("fcm-node");
+const { log } = require("console");
+const client = algoliasearch("FGYOEUJ8DR", "ad1139d39fa664e5969253e8f33b698f");
+const index = client.initIndex("IPOSearch");
+/**
+ * The following Api contains source code for a Create 2 Type IPO in This Code MainLineIPO,SmeIPO
+ * And In This Code Updated 2 Type IPO in This Code MainLineIPO,SmeIPO.
+ */
+const createMainlineIPO = async (req, res, body) => {
+  try {
+    const id = req.params.id;
+    delete req.params.id;
+    const GetIpo = userInformation.doc(id);
+    const GetData = await GetIpo.get();
+    const GeneralIPO = req.body;
+    if (GetData.exists) {
+      const updatedAt = new Date();
+      const Merged = { ...GeneralIPO, updatedAt };
+      await userInformation.doc(id).update(Merged, { new: true });
+      res.status(200).send({
+        msg: `${GeneralIPO.CategoryForIPOS} Updated Successfully`,
+        data: GeneralIPO,
+      });
+    } else {
+      const GeneralIPOData = req.body;
+      if (GeneralIPOData) {
+        const createdAt = new Date();
+        const Merged = { ...GeneralIPOData, createdAt };
+        const recordd = {
+          companyName: Merged.companyName,
+          IPOOpenDate: Merged.IPOOpenDate,
+          lotSize: Merged.lotSize,
+          GMPStatus: Merged.GMPStatus,
+          GMP: Merged.GMP,
+          IPOStatus: Merged.IPOStatus,
+          fromPrice: Merged.fromPrice,
+          toPrice: Merged.toPrice,
+        };
+
+        const id = await userInformation.add(Merged);
+        const ids = { id: id.id };
+        const CreatedAt = { createdAt: createdAt };
+        const merged = Object.assign(GeneralIPOData, ids, CreatedAt);
+        // const algoliaObject = {
+        //   ...merged,
+        // };
+        const algoliaObject = {
+          objectID: id.key,
+          ...recordd,
+        };
+        const algoliaResponse = await index.saveObject(algoliaObject, {
+          autoGenerateObjectIDIfNotExist: true,
+        });
+        const record = {
+          id: id.key,
+          ...merged,
+          algoliaID: algoliaResponse.objectID,
+        };
+        // index.saveObjects(
+        //   id,
+        //   { autoGenerateObjectIDIfNotExist: true },
+        //   (err, content) => {
+        //     if (err) throw err;
+        //     console.log(content);
+        //   }
+        // );
+
+        res.status(200).send({
+          msg: `${GeneralIPOData.CategoryForIPOS} Created Successfully`,
+          data: record,
+        });
+      } else {
+        res.status(300).send({ msg: "IPO Not Found" });
+      }
+    }
+    webApp.locals.bucket = admin.storage().bucket();
+  } catch (error) {
+    res.status(400).send(error);
+  }
+};
+/**
+ * The following Api contains source code for a GetAll IPo
+ * Search By Keyword
+ * Filter Data BY IPO Status
+ */
+const GetMainLineIpo = async (req, res) => {
+  try {
+    const limit = req.query.limit || 10;
+    let page = req.query.page || 1;
+    const CategoryForIPOS = req.body.CategoryForIPOS;
+    const keyword = req.body.keyword;
+    const Filter = req.body.Filter;
+    const search = req.body.search;
+    /*
+      Search Data For IPO
+      **/
+    if (req.body.keyword) {
+      const companyName1 = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("companyName", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo = companyName1.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      const fromPrice2 = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("fromPrice", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo2 = fromPrice2.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      const toPrice3 = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("toPrice", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo3 = toPrice3.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      const IPOStatus = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("IPOStatus", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo4 = IPOStatus.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      const IPOOpenDate = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("IPOOpenDate", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo5 = IPOOpenDate.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      const IPOCloseDate = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("IPOCloseDate", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo6 = IPOCloseDate.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      const lotSize = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("lotSize", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo7 = lotSize.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      if (SearchIpo.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo } });
+      } else if (SearchIpo2.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo2 } });
+      } else if (SearchIpo3.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo3 } });
+      } else if (SearchIpo4.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo4 } });
+      } else if (SearchIpo5.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo5 } });
+      } else if (SearchIpo6.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo6 } });
+      } else if (SearchIpo7.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo7 } });
+      } else {
+        res.status(200).send({ msg: "Keyword Not Found" });
+      }
+      /*
+      Filter Data For IPO
+      **/
+    } else if (req.body.Filter) {
+      const IPOStatus = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("IPOStatus", "==", Filter)
+        .select(
+          "CategoryForIPOS",
+          "companyName",
+          "IPOOpenDate",
+          "IPOCloseDate",
+          "lotSize",
+          "GMPStatus",
+          "GMP",
+          "IPOStatus",
+          "fromPrice",
+          "toPrice",
+          "file",
+          "disclaimer"
+        );
+      IPOStatus.offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get()
+        .then((querySnapshot) => {
+          if (querySnapshot.size === 0) {
+            res.status(200).send({ msg: "No more documents left" });
+            return;
+          }
+          const MainLineIpo = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          IPOStatus.get().then((querySnapshot) => {
+            let Total = querySnapshot.size;
+            const Merged = { MainLineIpo, Total };
+            res.status(200).send({ msg: "All IPOS", data: Merged });
+          });
+        });
+    } else if (search) {
+      const IPOStatus = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        // .where("IPOStatus", "==", search)
+        .select(
+          "CategoryForIPOS",
+          "companyName",
+          "IPOOpenDate",
+          "IPOCloseDate",
+          "lotSize",
+          "GMPStatus",
+          "GMP",
+          "IPOStatus",
+          "fromPrice",
+          "toPrice",
+          "file",
+          "disclaimer"
+        );
+      IPOStatus.offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get()
+        .then((querySnapshot) => {
+          if (querySnapshot.size === 0) {
+            res.status(200).send({ msg: "No more documents left" });
+            return;
+          }
+          const MainLineIpo = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          IPOStatus.get().then((querySnapshot) => {
+            let Total = querySnapshot.size;
+            const Merged = { MainLineIpo, Total };
+
+            index.setSettings({
+              searchableAttributes: [
+                "companyName",
+                "IPOOpenDate",
+                "IPOCloseDate",
+                "lotSize",
+                "GMPStatus",
+                "IPOStatus",
+                "fromPrice",
+                "toPrice",
+                "disclaimer",
+                // add all other attributes you want to search across here
+              ],
+              attributesForFaceting: [
+                "numeric(fromPrice)",
+                "numeric(toPrice)",
+                "numeric(lotSize)",
+                // add all other numerical attributes here
+              ],
+            });
+            // index.saveObjects(Merged, { autoGe }).wait();
+            // index
+            //   .saveObjects(MainLineIpo, {
+            //     autoGenerateObjectIDIfNotExist: true,
+            //   })
+            //   .then(({ objectIDs }) => {
+            //     console.log(`Indexed ${objectIDs.length} objects to Algolia`);
+            //   })
+            //   .catch((err) => {
+            //     console.error(`Error indexing to Algolia: ${err}`);
+            //   });
+            index.search(search, { hitsPerPage: 10 }).then(({ hits }) => {
+              // const hits = MainLineIpo;
+          const MainLineIpo = { MainLineIpo: hits };
+              res.status(200).send({ msg: "All IPOS", data: MainLineIpo });
+            });
+            // const objectID = req.body.objectID;
+
+            // index.deleteObject(objectID, (err) => {
+            //   if (err) throw err;
+            //   console.log("Object removed successfully");
+            // });
+            // res.status(200).send({ msg: "All IPOS", data: Merged });
+          });
+        });
+    } else {
+      /*
+      GetAll
+      Data For IPO
+      **/
+      const GetIpo = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .select(
+          "CategoryForIPOS",
+          "companyName",
+          "IPOOpenDate",
+          "IPOCloseDate",
+          "lotSize",
+          "GMPStatus",
+          "GMP",
+          "IPOStatus",
+          "fromPrice",
+          "toPrice",
+          "file",
+          "disclaimer"
+        );
+      GetIpo.offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get()
+        .then((querySnapshot) => {
+          if (querySnapshot.size == 0) {
+            // No more documents left
+            res.status(200).send({ msg: "No more documents left" });
+            return;
+          }
+          const MainLineIpo = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          GetIpo.get().then((querySnapshot) => {
+            let Total = querySnapshot.size;
+            const Merged = { MainLineIpo, Total };
+            res.status(200).send({ msg: "All IPOS", data: Merged });
+          });
+        });
+    }
+  } catch (error) {
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+/**
+ * The following Api contains source code for a Get Single IPO.
+ */
+const GetIdByMainLineIpo = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const CategoryForIPOS = req.body.CategoryForIPOS;
+    var usersArray = [];
+    let True = true;
+    const data = await userInformation.get().then((snapshot) => {
+      snapshot.forEach((doc) => {
+        if (doc.id == id && True) {
+          True = false;
+          const Data = doc.data();
+          if (Data.CategoryForIPOS === CategoryForIPOS) {
+            //MainLineIPO Genral
+            const id = doc.id;
+            const disclaimer = Data.disclaimer;
+            const checkAllotment = Data.checkAllotment;
+            const preIssueShareHolding = Data.preIssueShareHolding;
+            const reatailQuota = Data.reatailQuota;
+            const qibQuota = Data.qibQuota;
+            const DRHPDraft = Data.DRHPDraft;
+            const companyDescription = Data.companyDescription;
+            const freshIssue = Data.freshIssue;
+            const fromPrice = Data.fromPrice;
+            const ObjectOfIssue = Data.ObjectOfIssue;
+            const postIssueShareHolding = Data.postIssueShareHolding;
+            const issueSize = Data.issueSize;
+            const RHPDraft = Data.RHPDraft;
+            const promotersName = Data.promotersName;
+            const faceValue = Data.faceValue;
+            const toPrice = Data.toPrice;
+            const issueType = Data.issueType;
+            const companyName = Data.companyName;
+            const nilQuota = Data.nilQuota;
+            const listingAt = Data.listingAt;
+            const offerForSale = Data.offerForSale;
+            const lotSize = Data.lotSize;
+            const checkLiveSubscriptionUrl = Data.checkLiveSubscriptionUrl;
+            const subscriptionDateAndTime = Data.subscriptionDateAndTime;
+            //MainLineIPO Financial
+            const earningPerShare = Data.earningPerShare;
+            const peersComparison = Data.peersComparison;
+            const financialLotsize = Data.financialLotsize;
+            const returnonNetWorth = Data.returnonNetWorth;
+            const companyFinancials = Data.companyFinancials;
+            const netAssetValue = Data.netAssetValue;
+            const earningPERatio = Data.earningPERatio;
+            //MainLineIPO Subscription
+            const sNII = Data.sNII;
+            const others = Data.others;
+            const total = Data.total;
+            const subscriptionDetails = Data.subscriptionDetails;
+            const retailInvestors = Data.retailInvestors;
+            const qualifiedInstitutions = Data.qualifiedInstitutions;
+            const employees = Data.employees;
+            const bNII = Data.bNII;
+            const nonInstitutionalBuyers = Data.nonInstitutionalBuyers;
+            //MainLineIPO ListingInfo
+            const scriptPosition = Data.scriptPosition;
+            const closingDifferent = Data.closingDifferent;
+            const listingDifferent = Data.listingDifferent;
+            const BSEScript = Data.BSEScript;
+            const closingPrice = Data.closingPrice;
+            const listingPrice = Data.listingPrice;
+            const listingPosition = Data.listingPosition;
+            const weekLow = Data.weekLow;
+            const NSECode = Data.NSECode;
+            const closingDate = Data.closingDate;
+            const listingDate = Data.listingDate;
+            const weekHigh = Data.weekHigh;
+
+            //MainLineIPO CompanyRegisterInfo
+            const registerPhone = Data.registerPhone;
+            const address = Data.address;
+            const registerEmail = Data.registerEmail;
+            const registerName = Data.registerName;
+            const companyPhone = Data.companyPhone;
+            const email = Data.email;
+            const registerWebsite = Data.registerWebsite;
+            const allotmentLink = Data.allotmentLink;
+            const website = Data.website;
+
+            //Status
+            const IPOstatus = Data.IPOStatus;
+            const CategoryForIPOS = Data.CategoryForIPOS;
+            //Tentative Timetable
+            const IPOOpenDate = Data.IPOOpenDate;
+            const IPOCloseDate = Data.IPOCloseDate;
+            const IPOAllotmentDate = Data.IPOAllotmentDate;
+            const IPORefundsInitiation = Data.IPORefundsInitiation;
+            const IPODematTransfer = Data.IPODematTransfer;
+            const IPOListingDate = Data.IPOListingDate;
+            const chatRoomId = Data.chatRoomId;
+            const shortText = Data.shortText;
+            const file = Data.file;
+            usersArray.push(doc.data());
+            const General = {
+              disclaimer,
+              checkAllotment,
+              chatRoomId,
+              shortText,
+              IPOOpenDate,
+              IPOCloseDate,
+              IPOAllotmentDate,
+              IPORefundsInitiation,
+              IPODematTransfer,
+              IPOListingDate,
+              IPOstatus,
+              preIssueShareHolding,
+              reatailQuota,
+              qibQuota,
+              DRHPDraft,
+              companyDescription,
+              freshIssue,
+              fromPrice,
+              ObjectOfIssue,
+              postIssueShareHolding,
+              issueSize,
+              RHPDraft,
+              promotersName,
+              faceValue,
+              toPrice,
+              issueType,
+              companyName,
+              nilQuota,
+              listingAt,
+              offerForSale,
+              lotSize,
+              earningPerShare,
+              peersComparison,
+              financialLotsize,
+              returnonNetWorth,
+              companyFinancials,
+              netAssetValue,
+              earningPERatio,
+              sNII,
+              others,
+              total,
+              subscriptionDetails,
+              retailInvestors,
+              qualifiedInstitutions,
+              employees,
+              bNII,
+              nonInstitutionalBuyers,
+              registerPhone,
+              address,
+              registerEmail,
+              registerName,
+              companyPhone,
+              email,
+              registerWebsite,
+              allotmentLink,
+              website,
+              scriptPosition,
+              closingDifferent,
+              listingDifferent,
+              BSEScript,
+              closingPrice,
+              listingPrice,
+              listingPosition,
+              weekLow,
+              NSECode,
+              closingDate,
+              listingDate,
+              weekHigh,
+              id,
+              CategoryForIPOS,
+              file,
+              checkLiveSubscriptionUrl,
+              subscriptionDateAndTime,
+            };
+            res.status(200).send({
+              msg: `${CategoryForIPOS}IPO Get Successfully`,
+              IPODetails: General,
+            });
+          } else {
+            res.status(300).send({
+              msg: "IPO Category Not Found",
+            });
+          }
+        }
+      });
+      let Condition = true;
+      snapshot.forEach((doc) => {
+        if (doc.id !== id && True && Condition) {
+          Condition = false;
+          res.status(400).send({
+            msg: "User Not Get",
+          });
+        }
+      });
+    });
+  } catch (error) {
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+/**
+ * The following Api contains source code for a Update IPO.
+ */
+const UpdateMainLineIpo = async (req, res) => {
+  try {
+    const fcm = new FCM(
+      "AAAA2MoJTos:APA91bHlpbZR1jxLqlkda5Th7MkrLzq29LgZMhfOXotO_0yOXTJe6-pCFCTQBqCk0d1xe7oggllZhfqgqCRDD9rpsIJ4bs_dSHF_nl55V3iPsFIWjPyaR1qFak1AcwCw_oxRa4hpqvGj"
+    );
+    const id = req.params.id;
+    delete req.params.id;
+    const GetIpo = userInformation.doc(id);
+
+    const GetData = await GetIpo.get();
+    const name = GetData.data().companyName;
+    // console.log(name);
+    const data = req.body;
+    if (GetData.exists) {
+      // const name = GetData.companyName;
+      // console.log(name);
+      if (data.IPOStatus === "AllotmentOut") {
+        const GetTokens = await Tokens.select("token").get();
+        const GetAllToken = GetTokens.docs.map((doc) => ({
+          ...doc.data(),
+        }));
+        GetAllToken.map((i) => {
+          const aaa = i.token;
+          const deviceToken = aaa;
+          userInformation.doc(id).update(data, { new: true });
+          var message = {
+            to: deviceToken,
+            notification: {
+              title: `${name}`,
+              body: `Allotment is out Now.${"\n"}Check our App for Allotment Status ✌️`,
+            },
+            data: {
+              type: "Offers",
+            },
+          };
+          fcm.send(message, function (err, response) {});
+          //
+        });
+
+        res.status(200).send({ msg: "Ipo updated Successfully", data: data });
+      } else {
+        console.log("2");
+        await userInformation.doc(id).update(data, { new: true });
+        res.status(200).send({ msg: "Ipo updated Successfully", data: data });
+      }
+    } else {
+      res.status(300).send({ msg: "UserId Not Found" });
+    }
+  } catch (error) {
+    console.log(error, "error");
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+// const UpdateMainLineIpo = async (req, res) => {
+//   try {
+//     const id = req.params.id;
+//     delete req.params.id;
+//     const GetIpo = userInformation.doc(id);
+
+//     const GetData = await GetIpo.get();
+//     const data = req.body;
+//     if (GetData.exists) {
+//       await userInformation.doc(id).update(data, { new: true });
+//       res.status(200).send({ msg: "Ipo updated Successfully", data: data });
+//     } else {
+//       res.status(300).send({ msg: "UserId Not Found" });
+//     }
+//   } catch (error) {
+//     res.status(400).send({ msg: "User Not Found" });
+//   }
+// };
+/**
+ * The following Api contains source code for a Delete IPO.
+ */
+const DeleteMainLineIpo = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const GetIpo = await userInformation.doc(id);
+    const GetData = await GetIpo.get();
+    if (GetData.exists) {
+      await userInformation.doc(id).delete();
+      const index = client.initIndex("IPOSearch");
+      const objectID = id; // the object ID of the record to delete
+      index
+        .deleteObject(objectID)
+        .then((res) => {
+          console.log(`Record with ID ${objectID} deleted successfully`);
+        })
+        .catch((err) => {
+          console.error(err);
+        });
+      res.status(200).send({ msg: "User Deleted Successfully" });
+    } else {
+      res.status(400).send({ msg: "Oops! User Not Found" });
+    }
+  } catch (error) {
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+/**
+ * The following Api contains source code for a Upload Image.
+ */
+webApp.locals.bucket = admin.storage().bucket();
+const uploadImage = async (req, res) => {
+  try {
+    if (req.file) {
+      const name = saltedMd5(req.file.originalname, "SUPER-S@LT!");
+      const fileName = name + path.extname(req.file.originalname);
+      await webApp.locals.bucket
+        .file(fileName)
+        .createWriteStream()
+        .end(req.file.buffer);
+      const id = req.params.id;
+      const GetIpo = userInformation.doc(id);
+      const GetData = await GetIpo.get();
+      const file = `https://firebasestorage.googleapis.com/v0/b/ipodekho-19fc1.appspot.com/o/${fileName}?alt=media&token=11c648b5-a554-401c-bc4e-ba9155f29744`;
+      if (GetData.exists) {
+        const merged = Object.assign({ file: file, id: id });
+        await userInformation.doc(id).update({ file: file });
+        res
+          .status(200)
+          .send({ msg: "Image Uploaded Successfully", data: merged });
+      } else {
+        const name = saltedMd5(req.file.originalname, "SUPER-S@LT!");
+        const fileName = name + path.extname(req.file.originalname);
+        await webApp.locals.bucket
+          .file(fileName)
+          .createWriteStream()
+          .end(req.file.buffer);
+        const file = `https://firebasestorage.googleapis.com/v0/b/ipodekho-19fc1.appspot.com/o/${fileName}?alt=media&token=11c648b5-a554-401c-bc4e-ba9155f29744`;
+        const file1 = {
+          file: file,
+        };
+        const id = await userInformation.add(file1);
+        const ids = { id: id.id };
+        // const concat = { GeneralIPOData, ...id };
+        // const AllIpo = { concat };
+        const merged = Object.assign({ file: file, id: id.id });
+        res.status(200).send({
+          msg: "Image Uploaded Successfully",
+          data: merged,
+        });
+      }
+    } else if (req.file == null) {
+      const id = req.params.id;
+      delete req.params.id;
+      const GetIpo = userInformation.doc(id);
+      const GetData = await GetIpo.get();
+      const file = req.file;
+      const updateFile = {
+        file: "",
+        id: id,
+      };
+      if (GetData.exists) {
+        await userInformation.doc(id).update(updateFile, { new: true });
+
+        res
+          .status(200)
+          .send({ msg: "Image Updated Successfully", status: updateFile });
+      } else {
+        res.status(300).send({ msg: "Image Not Found" });
+      }
+    }
+  } catch (error) {
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+
+/**
+ * The following Api contains source code for Get Single Image.
+ */
+const GetImage = async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    var usersArray = [];
+    let True = true;
+    const data = await userInformation.get().then((snapshot) => {
+      snapshot.forEach((doc) => {
+        if (doc.id === id && True) {
+          True = false;
+          const Data = doc.data(usersArray.id);
+          const File = Data.file;
+          usersArray.push(doc.data());
+          res.status(200).send({
+            msg: "File Get Successfully",
+            Image: File,
+          });
+        }
+      });
+      let Condition = true;
+      snapshot.forEach((doc) => {
+        if (doc.id !== id && True && Condition) {
+          Condition = false;
+          res.status(400).send({
+            msg: "Image Not Get",
+          });
+        }
+      });
+    });
+  } catch (error) {
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+
+//delete Sme And MainLine
+const DeleteIPO = async (req, res) => {
+  const id = req.params.id;
+  const IPOId = userInformation.doc(id);
+  const GetData = await IPOId.get();
+  if (GetData.exists) {
+    await userInformation.doc(id).delete();
+    res.status(200).send({ msg: "IPO Deleted Successfully" });
+  } else {
+    res.status(400).send({ msg: "Oops! User Not Found" });
+  }
+};
+module.exports = {
+  createMainlineIPO,
+  GetMainLineIpo,
+  UpdateMainLineIpo,
+  DeleteMainLineIpo,
+  GetIdByMainLineIpo,
+  uploadImage,
+  GetImage,
+  DeleteIPO,
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+MainLineIPO
+const { firestore } = require("../../config/firestoreCloud");
+const express = require("express");
+const webApp = express();
+const saltedMd5 = require("salted-md5");
+const path = require("path");
+var admin = require("firebase-admin");
+const Tokens = firestore.collection("Tokens");
+const userInformation = firestore.collection("MainLineIPO");
+const messageCollection = firestore.collection("messageCollection");
+const algoliasearch = require("algoliasearch");
+const FCM = require("fcm-node");
+const { log } = require("console");
+const client = algoliasearch("FGYOEUJ8DR", "ad1139d39fa664e5969253e8f33b698f");
+const index = client.initIndex("IPOSearch");
+/**
+ * The following Api contains source code for a Create 2 Type IPO in This Code MainLineIPO,SmeIPO
+ * And In This Code Updated 2 Type IPO in This Code MainLineIPO,SmeIPO.
+ */
+const createMainlineIPO = async (req, res, body) => {
+  try {
+    const id = req.params.id;
+    delete req.params.id;
+    const GetIpo = userInformation.doc(id);
+    const GetData = await GetIpo.get();
+    const GeneralIPO = req.body;
+    if (GetData.exists) {
+      const updatedAt = new Date();
+      const Merged = { ...GeneralIPO, updatedAt };
+      await userInformation.doc(id).update(Merged, { new: true });
+      res.status(200).send({
+        msg: `${GeneralIPO.CategoryForIPOS} Updated Successfully`,
+        data: GeneralIPO,
+      });
+    } else {
+      const GeneralIPOData = req.body;
+      if (GeneralIPOData) {
+        const createdAt = new Date();
+        const Merged = { ...GeneralIPOData, createdAt };
+        const recordd = {
+          companyName: Merged.companyName,
+          IPOOpenDate: Merged.IPOOpenDate,
+          lotSize: Merged.lotSize,
+          GMPStatus: Merged.GMPStatus,
+          GMP: Merged.GMP,
+          IPOStatus: Merged.IPOStatus,
+          fromPrice: Merged.fromPrice,
+          toPrice: Merged.toPrice,
+          id: Merged.id,
+        };
+        // const algoliaObject = {
+        //   ...merged,
+        // };
+        // const algoliaObject = {
+        //   objectID: id.key,
+        //   ...recordd,
+        // };
+        const algoliaResponse = await index.saveObject(recordd, {
+          autoGenerateObjectIDIfNotExist: true,
+        });
+        const record = {
+          ...Merged,
+          algoliaID: algoliaResponse.objectID,
+        };
+        const id = await userInformation.add(record);
+        const ids = { id: id.id };
+        const CreatedAt = { createdAt: createdAt };
+        const Data = Object.assign(GeneralIPOData, ids, CreatedAt);
+
+        // index.saveObjects(
+        //   id,
+        //   { autoGenerateObjectIDIfNotExist: true },
+        //   (err, content) => {
+        //     if (err) throw err;
+        //     console.log(content);
+        //   }
+        // );
+
+        res.status(200).send({
+          msg: `${GeneralIPOData.CategoryForIPOS} Created Successfully`,
+          data: Data,
+        });
+      } else {
+        res.status(300).send({ msg: "IPO Not Found" });
+      }
+    }
+    webApp.locals.bucket = admin.storage().bucket();
+  } catch (error) {
+    res.status(400).send(error);
+  }
+};
+/**
+ * The following Api contains source code for a GetAll IPo
+ * Search By Keyword
+ * Filter Data BY IPO Status
+ */
+const GetMainLineIpo = async (req, res) => {
+  try {
+    const limit = req.query.limit || 10;
+    let page = req.query.page || 1;
+    const CategoryForIPOS = req.body.CategoryForIPOS;
+    const keyword = req.body.keyword;
+    const Filter = req.body.Filter;
+    const search = req.body.search;
+    /*
+      Search Data For IPO
+      **/
+    if (req.body.keyword) {
+      const companyName1 = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("companyName", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo = companyName1.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      const fromPrice2 = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("fromPrice", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo2 = fromPrice2.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      const toPrice3 = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("toPrice", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo3 = toPrice3.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      const IPOStatus = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("IPOStatus", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo4 = IPOStatus.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      const IPOOpenDate = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("IPOOpenDate", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo5 = IPOOpenDate.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      const IPOCloseDate = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("IPOCloseDate", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo6 = IPOCloseDate.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      const lotSize = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("lotSize", "==", keyword)
+        .offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get();
+      const SearchIpo7 = lotSize.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      if (SearchIpo.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo } });
+      } else if (SearchIpo2.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo2 } });
+      } else if (SearchIpo3.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo3 } });
+      } else if (SearchIpo4.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo4 } });
+      } else if (SearchIpo5.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo5 } });
+      } else if (SearchIpo6.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo6 } });
+      } else if (SearchIpo7.length > 0) {
+        res
+          .status(200)
+          .send({ msg: "All Ipo", data: { MainLineIpo: SearchIpo7 } });
+      } else {
+        res.status(200).send({ msg: "Keyword Not Found" });
+      }
+      /*
+      Filter Data For IPO
+      **/
+    } else if (req.body.Filter) {
+      const IPOStatus = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .where("IPOStatus", "==", Filter)
+        .select(
+          "CategoryForIPOS",
+          "companyName",
+          "IPOOpenDate",
+          "IPOCloseDate",
+          "lotSize",
+          "GMPStatus",
+          "GMP",
+          "IPOStatus",
+          "fromPrice",
+          "toPrice",
+          "file",
+          "disclaimer"
+        );
+      IPOStatus.offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get()
+        .then((querySnapshot) => {
+          if (querySnapshot.size === 0) {
+            res.status(200).send({ msg: "No more documents left" });
+            return;
+          }
+          const MainLineIpo = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          IPOStatus.get().then((querySnapshot) => {
+            let Total = querySnapshot.size;
+            const Merged = { MainLineIpo, Total };
+            res.status(200).send({ msg: "All IPOS", data: Merged });
+          });
+        });
+    } else if (search) {
+      const IPOStatus = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        // .where("IPOStatus", "==", search)
+        .select(
+          "CategoryForIPOS",
+          "companyName",
+          "IPOOpenDate",
+          "IPOCloseDate",
+          "lotSize",
+          "GMPStatus",
+          "GMP",
+          "IPOStatus",
+          "fromPrice",
+          "toPrice",
+          "file",
+          "disclaimer"
+        );
+      IPOStatus.offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get()
+        .then((querySnapshot) => {
+          if (querySnapshot.size === 0) {
+            res.status(200).send({ msg: "No more documents left" });
+            return;
+          }
+          const MainLineIpo = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          IPOStatus.get().then((querySnapshot) => {
+            let Total = querySnapshot.size;
+            const Merged = { MainLineIpo, Total };
+
+            index.setSettings({
+              searchableAttributes: [
+                "companyName",
+                "IPOOpenDate",
+                "IPOCloseDate",
+                "lotSize",
+                "GMPStatus",
+                "IPOStatus",
+                "fromPrice",
+                "toPrice",
+                "disclaimer",
+                // add all other attributes you want to search across here
+              ],
+              attributesForFaceting: [
+                "numeric(fromPrice)",
+                "numeric(toPrice)",
+                "numeric(lotSize)",
+                // add all other numerical attributes here
+              ],
+            });
+            // index.saveObjects(Merged, { autoGe }).wait();
+            // index
+            //   .saveObjects(MainLineIpo, {
+            //     autoGenerateObjectIDIfNotExist: true,
+            //   })
+            //   .then(({ objectIDs }) => {
+            //     console.log(`Indexed ${objectIDs.length} objects to Algolia`);
+            //   })
+            //   .catch((err) => {
+            //     console.error(`Error indexing to Algolia: ${err}`);
+            //   });
+            index.search(search, { hitsPerPage: 10 }).then(({ hits }) => {
+              // const hits = MainLineIpo;
+              const MainLineIpo = { MainLineIpo: hits };
+              res.status(200).send({ msg: "All IPOS", data: MainLineIpo });
+            });
+            // const objectID = req.body.objectID;
+
+            // index.deleteObject(objectID, (err) => {
+            //   if (err) throw err;
+            //   console.log("Object removed successfully");
+            // });
+            // res.status(200).send({ msg: "All IPOS", data: Merged });
+          });
+        });
+    } else {
+      /*
+      GetAll
+      Data For IPO
+      **/
+      const GetIpo = await userInformation
+        .where("CategoryForIPOS", "==", CategoryForIPOS)
+        .select(
+          "CategoryForIPOS",
+          "companyName",
+          "IPOOpenDate",
+          "IPOCloseDate",
+          "lotSize",
+          "GMPStatus",
+          "GMP",
+          "IPOStatus",
+          "fromPrice",
+          "toPrice",
+          "file",
+          "disclaimer"
+        );
+      GetIpo.offset(Number(page - 1) * limit)
+        .limit(Number(limit))
+        .get()
+        .then((querySnapshot) => {
+          if (querySnapshot.size == 0) {
+            // No more documents left
+            res.status(200).send({ msg: "No more documents left" });
+            return;
+          }
+          const MainLineIpo = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          GetIpo.get().then((querySnapshot) => {
+            let Total = querySnapshot.size;
+            const Merged = { MainLineIpo, Total };
+            res.status(200).send({ msg: "All IPOS", data: Merged });
+          });
+        });
+    }
+  } catch (error) {
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+/**
+ * The following Api contains source code for a Get Single IPO.
+ */
+const GetIdByMainLineIpo = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const CategoryForIPOS = req.body.CategoryForIPOS;
+    var usersArray = [];
+    let True = true;
+    const data = await userInformation.get().then((snapshot) => {
+      snapshot.forEach((doc) => {
+        if (doc.id == id && True) {
+          True = false;
+          const Data = doc.data();
+          if (Data.CategoryForIPOS === CategoryForIPOS) {
+            //MainLineIPO Genral
+            const id = doc.id;
+            const disclaimer = Data.disclaimer;
+            const checkAllotment = Data.checkAllotment;
+            const preIssueShareHolding = Data.preIssueShareHolding;
+            const reatailQuota = Data.reatailQuota;
+            const qibQuota = Data.qibQuota;
+            const DRHPDraft = Data.DRHPDraft;
+            const companyDescription = Data.companyDescription;
+            const freshIssue = Data.freshIssue;
+            const fromPrice = Data.fromPrice;
+            const ObjectOfIssue = Data.ObjectOfIssue;
+            const postIssueShareHolding = Data.postIssueShareHolding;
+            const issueSize = Data.issueSize;
+            const RHPDraft = Data.RHPDraft;
+            const promotersName = Data.promotersName;
+            const faceValue = Data.faceValue;
+            const toPrice = Data.toPrice;
+            const issueType = Data.issueType;
+            const companyName = Data.companyName;
+            const nilQuota = Data.nilQuota;
+            const listingAt = Data.listingAt;
+            const offerForSale = Data.offerForSale;
+            const lotSize = Data.lotSize;
+            const checkLiveSubscriptionUrl = Data.checkLiveSubscriptionUrl;
+            const subscriptionDateAndTime = Data.subscriptionDateAndTime;
+            //MainLineIPO Financial
+            const earningPerShare = Data.earningPerShare;
+            const peersComparison = Data.peersComparison;
+            const financialLotsize = Data.financialLotsize;
+            const returnonNetWorth = Data.returnonNetWorth;
+            const companyFinancials = Data.companyFinancials;
+            const netAssetValue = Data.netAssetValue;
+            const earningPERatio = Data.earningPERatio;
+            //MainLineIPO Subscription
+            const sNII = Data.sNII;
+            const others = Data.others;
+            const total = Data.total;
+            const subscriptionDetails = Data.subscriptionDetails;
+            const retailInvestors = Data.retailInvestors;
+            const qualifiedInstitutions = Data.qualifiedInstitutions;
+            const employees = Data.employees;
+            const bNII = Data.bNII;
+            const nonInstitutionalBuyers = Data.nonInstitutionalBuyers;
+            //MainLineIPO ListingInfo
+            const scriptPosition = Data.scriptPosition;
+            const closingDifferent = Data.closingDifferent;
+            const listingDifferent = Data.listingDifferent;
+            const BSEScript = Data.BSEScript;
+            const closingPrice = Data.closingPrice;
+            const listingPrice = Data.listingPrice;
+            const listingPosition = Data.listingPosition;
+            const weekLow = Data.weekLow;
+            const NSECode = Data.NSECode;
+            const closingDate = Data.closingDate;
+            const listingDate = Data.listingDate;
+            const weekHigh = Data.weekHigh;
+
+            //MainLineIPO CompanyRegisterInfo
+            const registerPhone = Data.registerPhone;
+            const address = Data.address;
+            const registerEmail = Data.registerEmail;
+            const registerName = Data.registerName;
+            const companyPhone = Data.companyPhone;
+            const email = Data.email;
+            const registerWebsite = Data.registerWebsite;
+            const allotmentLink = Data.allotmentLink;
+            const website = Data.website;
+
+            //Status
+            const IPOstatus = Data.IPOStatus;
+            const CategoryForIPOS = Data.CategoryForIPOS;
+            //Tentative Timetable
+            const IPOOpenDate = Data.IPOOpenDate;
+            const IPOCloseDate = Data.IPOCloseDate;
+            const IPOAllotmentDate = Data.IPOAllotmentDate;
+            const IPORefundsInitiation = Data.IPORefundsInitiation;
+            const IPODematTransfer = Data.IPODematTransfer;
+            const IPOListingDate = Data.IPOListingDate;
+            const chatRoomId = Data.chatRoomId;
+            const shortText = Data.shortText;
+            const file = Data.file;
+            usersArray.push(doc.data());
+            const General = {
+              disclaimer,
+              checkAllotment,
+              chatRoomId,
+              shortText,
+              IPOOpenDate,
+              IPOCloseDate,
+              IPOAllotmentDate,
+              IPORefundsInitiation,
+              IPODematTransfer,
+              IPOListingDate,
+              IPOstatus,
+              preIssueShareHolding,
+              reatailQuota,
+              qibQuota,
+              DRHPDraft,
+              companyDescription,
+              freshIssue,
+              fromPrice,
+              ObjectOfIssue,
+              postIssueShareHolding,
+              issueSize,
+              RHPDraft,
+              promotersName,
+              faceValue,
+              toPrice,
+              issueType,
+              companyName,
+              nilQuota,
+              listingAt,
+              offerForSale,
+              lotSize,
+              earningPerShare,
+              peersComparison,
+              financialLotsize,
+              returnonNetWorth,
+              companyFinancials,
+              netAssetValue,
+              earningPERatio,
+              sNII,
+              others,
+              total,
+              subscriptionDetails,
+              retailInvestors,
+              qualifiedInstitutions,
+              employees,
+              bNII,
+              nonInstitutionalBuyers,
+              registerPhone,
+              address,
+              registerEmail,
+              registerName,
+              companyPhone,
+              email,
+              registerWebsite,
+              allotmentLink,
+              website,
+              scriptPosition,
+              closingDifferent,
+              listingDifferent,
+              BSEScript,
+              closingPrice,
+              listingPrice,
+              listingPosition,
+              weekLow,
+              NSECode,
+              closingDate,
+              listingDate,
+              weekHigh,
+              id,
+              CategoryForIPOS,
+              file,
+              checkLiveSubscriptionUrl,
+              subscriptionDateAndTime,
+            };
+            res.status(200).send({
+              msg: `${CategoryForIPOS}IPO Get Successfully`,
+              IPODetails: General,
+            });
+          } else {
+            res.status(300).send({
+              msg: "IPO Category Not Found",
+            });
+          }
+        }
+      });
+      let Condition = true;
+      snapshot.forEach((doc) => {
+        if (doc.id !== id && True && Condition) {
+          Condition = false;
+          res.status(400).send({
+            msg: "User Not Get",
+          });
+        }
+      });
+    });
+  } catch (error) {
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+/**
+ * The following Api contains source code for a Update IPO.
+ */
+const UpdateMainLineIpo = async (req, res) => {
+  try {
+    const fcm = new FCM(
+      "AAAA2MoJTos:APA91bHlpbZR1jxLqlkda5Th7MkrLzq29LgZMhfOXotO_0yOXTJe6-pCFCTQBqCk0d1xe7oggllZhfqgqCRDD9rpsIJ4bs_dSHF_nl55V3iPsFIWjPyaR1qFak1AcwCw_oxRa4hpqvGj"
+    );
+    const id = req.params.id;
+    delete req.params.id;
+    const GetIpo = userInformation.doc(id);
+
+    const GetData = await GetIpo.get();
+    const name = GetData.data().companyName;
+    // console.log(name);
+    const data = req.body;
+    if (GetData.exists) {
+      // const name = GetData.companyName;
+      // console.log(name);
+      if (data.IPOStatus === "AllotmentOut") {
+        const GetTokens = await Tokens.select("token").get();
+        const GetAllToken = GetTokens.docs.map((doc) => ({
+          ...doc.data(),
+        }));
+        GetAllToken.map((i) => {
+          const aaa = i.token;
+          const deviceToken = aaa;
+          userInformation.doc(id).update(data, { new: true });
+          var message = {
+            to: deviceToken,
+            notification: {
+              title: `${name}`,
+              body: `Allotment is out Now.${"\n"}Check our App for Allotment Status ✌️`,
+            },
+            data: {
+              type: "Offers",
+            },
+          };
+          fcm.send(message, function (err, response) {});
+          //
+        });
+
+        res.status(200).send({ msg: "Ipo updated Successfully", data: data });
+      } else {
+        console.log("2");
+        await userInformation.doc(id).update(data, { new: true });
+        res.status(200).send({ msg: "Ipo updated Successfully", data: data });
+      }
+    } else {
+      res.status(300).send({ msg: "UserId Not Found" });
+    }
+  } catch (error) {
+    console.log(error, "error");
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+// const UpdateMainLineIpo = async (req, res) => {
+//   try {
+//     const id = req.params.id;
+//     delete req.params.id;
+//     const GetIpo = userInformation.doc(id);
+
+//     const GetData = await GetIpo.get();
+//     const data = req.body;
+//     if (GetData.exists) {
+//       await userInformation.doc(id).update(data, { new: true });
+//       res.status(200).send({ msg: "Ipo updated Successfully", data: data });
+//     } else {
+//       res.status(300).send({ msg: "UserId Not Found" });
+//     }
+//   } catch (error) {
+//     res.status(400).send({ msg: "User Not Found" });
+//   }
+// };
+/**
+ * The following Api contains source code for a Delete IPO.
+ */
+const DeleteMainLineIpo = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const GetIpo = await userInformation.doc(id);
+    const GetData = await GetIpo.get();
+    if (GetData.exists) {
+      await userInformation.doc(id).delete();
+      const index = client.initIndex("IPOSearch");
+      const objectID = id; // the object ID of the record to delete
+      index
+        .deleteObject(objectID)
+        .then((res) => {
+          console.log(`Record with ID ${objectID} deleted successfully`);
+        })
+        .catch((err) => {
+          console.error(err);
+        });
+      res.status(200).send({ msg: "User Deleted Successfully" });
+    } else {
+      res.status(400).send({ msg: "Oops! User Not Found" });
+    }
+  } catch (error) {
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+/**
+ * The following Api contains source code for a Upload Image.
+ */
+webApp.locals.bucket = admin.storage().bucket();
+const uploadImage = async (req, res) => {
+  try {
+    if (req.file) {
+      const name = saltedMd5(req.file.originalname, "SUPER-S@LT!");
+      const fileName = name + path.extname(req.file.originalname);
+      await webApp.locals.bucket
+        .file(fileName)
+        .createWriteStream()
+        .end(req.file.buffer);
+      const id = req.params.id;
+      const GetIpo = userInformation.doc(id);
+      const GetData = await GetIpo.get();
+      const file = `https://firebasestorage.googleapis.com/v0/b/ipodekho-19fc1.appspot.com/o/${fileName}?alt=media&token=11c648b5-a554-401c-bc4e-ba9155f29744`;
+      if (GetData.exists) {
+        const merged = Object.assign({ file: file, id: id });
+        await userInformation.doc(id).update({ file: file });
+        res
+          .status(200)
+          .send({ msg: "Image Uploaded Successfully", data: merged });
+      } else {
+        const name = saltedMd5(req.file.originalname, "SUPER-S@LT!");
+        const fileName = name + path.extname(req.file.originalname);
+        await webApp.locals.bucket
+          .file(fileName)
+          .createWriteStream()
+          .end(req.file.buffer);
+        const file = `https://firebasestorage.googleapis.com/v0/b/ipodekho-19fc1.appspot.com/o/${fileName}?alt=media&token=11c648b5-a554-401c-bc4e-ba9155f29744`;
+        const file1 = {
+          file: file,
+        };
+        const id = await userInformation.add(file1);
+        const ids = { id: id.id };
+        // const concat = { GeneralIPOData, ...id };
+        // const AllIpo = { concat };
+        const merged = Object.assign({ file: file, id: id.id });
+        res.status(200).send({
+          msg: "Image Uploaded Successfully",
+          data: merged,
+        });
+      }
+    } else if (req.file == null) {
+      const id = req.params.id;
+      delete req.params.id;
+      const GetIpo = userInformation.doc(id);
+      const GetData = await GetIpo.get();
+      const file = req.file;
+      const updateFile = {
+        file: "",
+        id: id,
+      };
+      if (GetData.exists) {
+        await userInformation.doc(id).update(updateFile, { new: true });
+
+        res
+          .status(200)
+          .send({ msg: "Image Updated Successfully", status: updateFile });
+      } else {
+        res.status(300).send({ msg: "Image Not Found" });
+      }
+    }
+  } catch (error) {
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+
+/**
+ * The following Api contains source code for Get Single Image.
+ */
+const GetImage = async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    var usersArray = [];
+    let True = true;
+    const data = await userInformation.get().then((snapshot) => {
+      snapshot.forEach((doc) => {
+        if (doc.id === id && True) {
+          True = false;
+          const Data = doc.data(usersArray.id);
+          const File = Data.file;
+          usersArray.push(doc.data());
+          res.status(200).send({
+            msg: "File Get Successfully",
+            Image: File,
+          });
+        }
+      });
+      let Condition = true;
+      snapshot.forEach((doc) => {
+        if (doc.id !== id && True && Condition) {
+          Condition = false;
+          res.status(400).send({
+            msg: "Image Not Get",
+          });
+        }
+      });
+    });
+  } catch (error) {
+    res.status(400).send({ msg: "User Not Found" });
+  }
+};
+
+//delete Sme And MainLine
+const DeleteIPO = async (req, res) => {
+  const id = req.params.id;
+  const AlgoliaID = req.body.AlgoliaID;
+  const IPOId = userInformation.doc(id);
+  const GetData = await IPOId.get();
+  if (GetData.exists) {
+    await userInformation.doc(id).delete();
+    index
+      .deleteObject(AlgoliaID)
+      .then(() => {
+        console.log(`Object ${AlgoliaID} was deleted`);
+      })
+      .catch((error) => {
+        console.error(`Error deleting object ${AlgoliaID}:`, error);
+      });
+    res.status(200).send({ msg: "IPO Deleted Successfully" });
+  } else {
+    res.status(400).send({ msg: "Oops! User Not Found" });
+  }
+};
+module.exports = {
+  createMainlineIPO,
+  GetMainLineIpo,
+  UpdateMainLineIpo,
+  DeleteMainLineIpo,
+  GetIdByMainLineIpo,
+  uploadImage,
+  GetImage,
+  DeleteIPO,
+};
+
+
